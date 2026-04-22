@@ -103,9 +103,13 @@ input[type=range]::-moz-range-thumb{width:15px;height:15px;border-radius:50%;bac
 </table>
 <script>
 var D={base:85000,ote:130000,quota:1500000,bk:1082223,role:'AM I',name:'Shayne'};
-var NR={'<80':0.01,'80-89':0.02,'90-99':0.025,'100':0.03};
-var LM={'<80':0.5,'80-89':0.9,'90-99':1.0,'100':1.25};
-var ER={'<80':0,'80-89':0.05,'90-99':0.075,'100':0.10};
+var RATES={
+  '<80':  {'<80':0.005,'80-89':0.009,'90-99':0.010,'100':0.013},
+  '80-89':{'<80':0.010,'80-89':0.018,'90-99':0.020,'100':0.025},
+  '90-99':{'<80':0.013,'80-89':0.023,'90-99':0.025,'100':0.031},
+  '100':  {'<80':0.015,'80-89':0.027,'90-99':0.030,'100':0.038}
+};
+var ACCEL={'<80':0.00,'80-89':0.05,'90-99':0.08,'100':0.10};
 function tier(p){return p<80?'<80':p<90?'80-89':p<100?'90-99':'100';}
 function tl(t){return t==='<80'?'< 80%':t==='100'?'100%':t+'%';}
 function tc(t){return t==='<80'?'br':t==='80-89'?'ba':'bg';}
@@ -114,13 +118,12 @@ function fmtK(n){return n>=1000000?'$'+(n/1000000).toFixed(2)+'M':'$'+Math.round
 function calc(np,lp){
   var adj=D.bk,end=adj*(np/100);
   var nt=tier(np),lt=tier(lp);
-  var bn=NR[nt]*Math.min(end,adj);
-  var la=bn*(LM[lt]-1);
-  var ex=np>=100?ER[nt]*Math.max(0,end-adj):0;
-  var v=bn+la+ex;
+  var effRate=RATES[nt][lt];
+  var bn=Math.round(effRate*Math.min(end,adj));
+  var ex=np>100?Math.round(ACCEL[lt]*Math.max(0,end-adj)):0;
+  var v=bn+ex;
   return{adj:adj,end:Math.round(end),nt:nt,lt:lt,
-    bn:Math.round(bn),la:Math.round(la),ex:Math.round(ex),
-    v:Math.round(v),tot:Math.round(D.base+v)};
+    effRate:effRate,bn:bn,ex:ex,v:v,tot:Math.round(D.base+v)};
 }
 var NRR_ROWS=[['Floor (70%)',70],['Low (80%)',80],['Below (85%)',85],
   ['On plan (90%)',90],['Near (95%)',95],['At quota (100%)',100],
@@ -145,14 +148,11 @@ function upd(){
   var at100=calc(100,100);
   var gap=D.ote-at100.tot;
   document.getElementById('rc').className='rcard'+(isOver?' hi':gap>20000?' warn':'');
-  var laColor=r.la>=0?'#166534':'#991b1b';
   document.getElementById('bd').innerHTML=
     '<div class="brow"><span class="bl">Adjusted target</span><span class="bv">'+fmt(r.adj)+'</span></div>'+
     '<div class="brow"><span class="bl">Ending book ('+np+'% NRR)</span><span class="bv">'+fmt(r.end)+'</span></div>'+
-    '<div class="brow"><span class="bl">NRR rate &mdash; '+tl(nt)+' tier</span><span class="bv">'+(NR[nt]*100).toFixed(1)+'%</span></div>'+
-    '<div class="brow"><span class="bl">Base NRR commission</span><span class="bv">'+fmt(r.bn)+'</span></div>'+
-    '<div class="brow"><span class="bl">Logo adj ('+LM[lt]+'&times;)</span><span class="bv" style="color:'+laColor+'">'+(r.la>=0?'+':'')+fmt(r.la)+'</span></div>'+
-    '<div class="brow"><span class="bl">Expansion commission</span><span class="bv" style="color:#166534">'+(r.ex>0?'+':'')+fmt(r.ex)+'</span></div>'+
+    '<div class="brow"><span class="bl">Commission on target ('+((r.effRate||0)*100).toFixed(1)+'%)</span><span class="bv">'+fmt(r.bn)+'</span></div>'+
+    '<div class="brow"><span class="bl">Accelerator on excess'+(np>100?' ('+ACCEL[lt]*100+'% &times; '+fmt(r.end-r.adj)+')':(': n/a &mdash; NRR &le; 100%'))+'</span><span class="bv" style="color:#166534">'+(r.ex>0?'+':'')+fmt(r.ex)+'</span></div>'+
     '<div class="brow"><span class="bl">Total variable comp</span><span class="bv">'+fmt(r.v)+'</span></div>'+
     '<div class="brow"><span class="bl">Total compensation</span><span class="bv" style="font-size:18px;color:'+(isOver?'#166534':r.tot>D.ote*0.85?'#92600a':'var(--text)')+'">'+fmt(r.tot)+'</span></div>';
   var oteGap=r.tot-D.ote;
